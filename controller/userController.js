@@ -62,7 +62,7 @@ exports.logoutUser = catchAsyncErrors(
     }
 )
 
-// forgot password
+// Forgot password
 
 exports.forgotPassword = catchAsyncErrors(
     async (req, res, next) => {
@@ -100,7 +100,7 @@ exports.forgotPassword = catchAsyncErrors(
     }
 )
 
-// reset password
+// Reset password
 
 exports.resetPassword = catchAsyncErrors(
     async (req, res, next) => {
@@ -121,5 +121,109 @@ exports.resetPassword = catchAsyncErrors(
 
         await user.save();
         sendToken(user, 200, res);
+    }
+)
+
+// Delete User
+
+exports.deleteUser = catchAsyncErrors(
+    async (req, res, next) => {
+        const id = req.params.id;
+        const user = await User.findById(id);
+        if (!user) {
+            next(new ErrorHandler(`User not found with ID:${req.params.id}`, 400));
+        }
+
+        await user.deleteOne();
+        res.status(200).json({ success: true, message: "user deleted successfully" });
+    }
+)
+
+// Get all users
+
+exports.getAllUsers = catchAsyncErrors(
+    async (req, res, next) => {
+        const users = await dbService.findMany(User);
+        if (!users) {
+            return next(new ErrorHandler("Users not found", 400));
+        }
+        res.status(200).json({ success: true, users })
+    }
+)
+
+// get profile
+
+exports.getProfile = catchAsyncErrors(
+    async (req, res, next) => {
+        const user = await dbService.findOne(User, { _id: req.user._id }, { password: 0 });
+        if (!user) {
+            return next(new ErrorHandler("User not found", 400));
+        }
+        res.status(200).json({ success: true, user })
+    }
+)
+
+// update user role
+
+exports.updateRole = catchAsyncErrors(
+    async (req, res, next) => {
+        const id = req.params.id;
+        const user = await User.findById(id);
+        console.log("🚀 ~ user:", user)
+        if (!user) {
+            return next(new ErrorHandler("User not found", 400));
+        }
+        user.role = req.body.role;
+        await user.save();
+        res.status(201).json({ success: true, message: "user role updated successfully" });
+
+    }
+)
+
+// Update Profile
+
+exports.updateProfile = catchAsyncErrors(
+    async (req, res, next) => {
+        const { email, name } = req.body;
+        const payload = {
+            email,
+            name
+        };
+
+        if (!email || !name) {
+            return next(new ErrorHandler("email or name is not provided", 400));
+        }
+
+        const user = await dbService.updateOne(User, { _id: req.user._id }, { $set: payload });
+        if (!user) {
+            return next(new ErrorHandler("User not found", 400));
+        }
+        res.status(200).json({ success: true })
+    }
+);
+
+// Update Role
+
+exports.newPassword = catchAsyncErrors(
+    async (req, res, next) => {
+        const { oldPassword, newPassword, confirmPassword } = req.body;
+        const user = await User.findById({ _id: req.user._id });
+        if (!user) {
+            next(new ErrorHandler("User not found", 400));
+        }
+
+        if (newPassword !== confirmPassword) {
+            next(new ErrorHandler("password does not match", 400));
+        }
+
+        const isPasswordMatched = await user.comparePassword(oldPassword);
+        if (isPasswordMatched) {
+            user.password = newPassword;
+            await user.save();
+
+            res.status(201).json({ success: true, message: "Your password updated successfully" })
+        } else {
+            next(new ErrorHandler("your old password does not match", 400))
+        }
     }
 )
