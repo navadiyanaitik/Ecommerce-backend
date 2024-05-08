@@ -5,6 +5,8 @@ const User = require("../model/users");
 const sendToken = require('../utils/jwtToken');
 const sendEmail = require('../utils/sendEmail.js');
 const crypto = require('crypto');
+const validation = require('../utils/validation/validateRequest.js')
+const userKeys = require('../utils/validation/userValidation.js');
 
 
 // Register user
@@ -12,15 +14,17 @@ const crypto = require('crypto');
 exports.registerUser = catchAsyncErrors(
     async (req, res, next) => {
         const { name, email, password } = req.body;
+        const isValidRequest = validation.validateParamsWithJoi(req.body, userKeys.registerUserSchemaKeys);
+        if (!isValidRequest.isValid) {
+            res.status(400).json({ success: false, message: 'Invalid Data, Validation Failed.' })
+        }
         const user = await dbService.create(User, {
             name, email, password, avatar: {
                 public_id: "this is sample Id",
                 url: "profilepicurl"
             }
         })
-
         sendToken(user, 201, res);
-
     }
 );
 
@@ -29,7 +33,10 @@ exports.registerUser = catchAsyncErrors(
 exports.loginUser = catchAsyncErrors(
     async (req, res, next) => {
         const { email, password } = req.body;
-
+        const isValidRequest = validation.validateParamsWithJoi(req.body, userKeys.loginSchemaKeys);
+        if (!isValidRequest.isValid) {
+            res.status(400).json({ success: false, message: 'Invalid Data, Validation Failed.' })
+        }
         // if user has given password and email both
         if (!email || !password) {
             return next(new ErrorHandler("Please enter Email & Password", 400));
@@ -66,6 +73,10 @@ exports.logoutUser = catchAsyncErrors(
 
 exports.forgotPassword = catchAsyncErrors(
     async (req, res, next) => {
+        // const isValidRequest = validation.validateParamsWithJoi(req.body.email, userKeys.forgotPasswordSchemaKeys);
+        // if (!isValidRequest.isValid) {
+        //     return next(new ErrorHandler(isValidRequest.message, 400));
+        // }
         const user = await User.findOne({ email: req.body.email });
 
         if (!user) {
@@ -104,6 +115,11 @@ exports.forgotPassword = catchAsyncErrors(
 
 exports.resetPassword = catchAsyncErrors(
     async (req, res, next) => {
+        const isValidRequest = validation.validateParamsWithJoi(req.body, userKeys.resetPasswordSchemaKeys);
+        if (!isValidRequest.isValid) {
+            res.status(400).json({ success: false, message: isValidRequest.message });
+            return next(new ErrorHandler(isValidRequest.message, 400));
+        }
         const resetPasswordToken = crypto.createHash("sha256").update(req.params.token).digest('hex');
         const user = await User.findOne({ resetPasswordToken, resetPasswordExpire: { $gt: Date.now() } });
 

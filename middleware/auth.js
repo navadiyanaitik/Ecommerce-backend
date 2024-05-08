@@ -24,4 +24,4 @@ exports.authorizedRole = (...roles) => {
         next()
     }
 
-}
+}   

@@ -68,3 +68,84 @@ exports.updateProduct = catchAsyncErrors(
         }
     }
 )
+
+exports.createProductReview = catchAsyncErrors(
+    async (req, res, next) => {
+        const { comment, rating, productId } = req.body;
+        const review = {
+            user: req.user._id,
+            name: req.user.name,
+            rating: Number(rating),
+            comment
+        }
+        const product = await Product.findById(productId);
+        if (!product) {
+            next(new ErrorHandler("Produnct now found", 400));
+        }
+
+        const isReviewed = product.reviews.some(item => {
+            return req.user._id.toString() === item.user.toString()
+        })
+
+        if (isReviewed) {
+            product.reviews.forEach(rev => {
+                if (rev.user.toString() === req.user._id.toString()) {
+                    rev.comment = comment;
+                    rev.rating = rating;
+                }
+            });
+        } else {
+            product.reviews.push(review);
+            product.numOfReviews = product.reviews.length;
+        }
+        let totalRatings = 0;
+        product.reviews.forEach(rev => totalRatings += Number(rev.rating));
+        product.ratings = (totalRatings / product.reviews.length).toFixed(1);
+        await product.save({ validateBeforeSave: false });
+
+        res.status(201).json({ success: true, message: "review collected/updated successfully" });
+    }
+)
+
+exports.getAllReviewsOfProduct = catchAsyncErrors(
+    async (req, res, next) => {
+        const id = req.query.id;
+        const product = await dbService.findOne(Product, { _id: id });;
+        if (!product) {
+            next(new ErrorHandler("Product not found", 404));
+        }
+        res.status(200).json({ success: true, productReviews: product.reviews })
+    }
+)
+
+exports.deleteProductReview = catchAsyncErrors(
+    async (req, res, next) => {
+        const id = req.query.id;
+        const productId = req.query.productId;
+
+        const product = await Product.findById(productId);
+        if (!product) {
+            return next(new ErrorHandler("Product not found", 404));
+        }
+
+        const filteredReviews = product.reviews.filter(review => review._id.toString() !== id.toString());
+
+        let totalRatings = 0;
+        filteredReviews.forEach(rev => totalRatings += rev.rating);
+        const ratings = (filteredReviews.length > 0) ? (totalRatings / filteredReviews.length).toFixed(1) : 0;
+        const numOfReviews = filteredReviews.length;
+
+        await Product.findByIdAndUpdate(productId, {
+            reviews: filteredReviews,
+            ratings,
+            numOfReviews
+        }, {
+            new: true,
+            runValidators: true,
+            useFindAndModify: false
+        }
+        );
+
+        res.status(200).json({ success: true });
+    }
+);

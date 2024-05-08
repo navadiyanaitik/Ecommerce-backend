@@ -4,6 +4,9 @@ const app = express();
 const logger = require('morgan');
 const errorMiddleware = require('./middleware/error');
 const cookieParser = require('cookie-parser');
+const cors = require("cors");
+
+dotenv.config({ path: '.env' });
 
 // unhandled Promise Rejection
 
@@ -16,9 +19,9 @@ process.on("uncaughtException", (err) => {
     })
 })
 
-dotenv.config({ path: '.env' });
-
 require('./config/dbConnection');
+const corsOptions = { origin: process.env.ALLOW_ORIGIN };
+app.use(cors(corsOptions));
 
 const routes = require('./routes')
 app.use(logger('dev'));
